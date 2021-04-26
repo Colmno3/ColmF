@@ -1,0 +1,312 @@
+import pandas as pd
+import re
+from sklearn.linear_model import LinearRegression
+import numpy as np
+import plotly.express as px
+import xgboost as xgb
+from sklearn.metrics import mean_squared_error
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn import metrics
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.graph_objects as go
+from sklearn.model_selection import train_test_split
+
+
+def regex_pattern_recognition(df1, df2):
+    # Using Regex for pattern extraction.
+
+    countries = df1['Country_name']
+    countries2021 = df1['Country_name']
+    region = df2['Regional indicator']
+
+    # Countries beginning with F
+    print("Countries beginning with F.")
+    print(countries[countries.str.count(r'(^F.*)') == 1])
+
+    # Countries beginning with P and ending with land.
+    print("Countries beginning with P and ending with land.")
+    print(countries[countries.str.count(r'(^P.*land$)') == 1])
+
+    # Region rows starting with Western
+    print(region.str.count(r'(^Western.*)').sum())
+    print(region[region.str.count(r'(^Western.*)') == 1])
+
+
+# Drop Duplicates and n/a replacement with mean.
+def data_filtering(df1):
+    # Total number of n/a values in df1
+    print(df1.isnull().sum())
+
+    # Drop Duplicates
+    print(len(df1))
+    df1 = df1.drop_duplicates(subset=["Country_name", "year", "Life Ladder", "Log GDP per capita", "Social support",
+                                      "Healthy life expectancy at birth", "Freedom to make life choices", "Generosity"
+        , "Perceptions of corruption", "Positive affect", "Negative affect"
+                                      ])
+
+    print(len(df1))
+
+    # Replace all NA with mean of the same column.
+    df1['Log GDP per capita'].fillna((df1['Log GDP per capita'].mean()), inplace=True)
+    df1['Social support'].fillna((df1['Social support'].mean()), inplace=True)
+    df1['Healthy life expectancy at birth'].fillna((df1['Healthy life expectancy at birth'].mean()), inplace=True)
+    df1['Freedom to make life choices'].fillna((df1['Freedom to make life choices'].mean()), inplace=True)
+    df1['Generosity'].fillna((df1['Generosity'].mean()), inplace=True)
+    df1['Perceptions of corruption'].fillna((df1['Perceptions of corruption'].mean()), inplace=True)
+    df1['Positive affect'].fillna((df1['Positive affect'].mean()), inplace=True)
+    df1['Negative affect'].fillna((df1['Negative affect'].mean()), inplace=True)
+    print(df1.isnull().sum())
+    return df1
+
+
+# Use Iterator.
+def iterator_usage(df1):
+    # Traverse whole dataframe and print all countries which have life ladder smaller than 3 and social suppoert greater than 0.5
+    # Find countries which
+    for index, row in df1.iterrows():
+        if row['Life Ladder'] < 3 and row['Social support'] > 0.526:
+            print(row['Country_name'], row['year'])
+
+
+# Pass whole dataset to this function and split between test and train so it can be used for training and testing the model.
+def traindata_testdata_split(df1):
+    X = df1
+    X = X.drop(['Country_name', 'Life Ladder'], axis=1)
+    print(X.head())
+    y = df1.iloc[:, 2].values
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+    return X_train, X_test, y_train, y_test
+
+
+# Merge datasets.
+def merged_dataset(X_train, X_test, df1):
+    training_replica = X_train.copy()
+    testing_replica = X_test.copy()
+
+    # set up a flag field to distinguish records from training and testing sets in the combined dataset
+    training_replica['tst'] = 0
+    testing_replica['tst'] = 1
+
+    # combine training and testing data into a single dataframe to do uniform part of feature engineering
+    all_data = pd.concat([training_replica, testing_replica], axis=0, copy=True)
+    del training_replica
+    del testing_replica
+
+    print("Merged Datasets")
+    print(df1.shape)
+    print(all_data.shape)
+
+
+def linear_regression(X_train, X_test, y_train, y_test):
+    # Linear regression.
+    regressor = LinearRegression()
+    regressor.fit(X_train, y_train)
+    print(regressor.intercept_)
+    print(regressor.coef_)
+
+    # Make predictions
+    y_pred = regressor.predict(X_test)
+    # print(y_pred)
+
+    df = pd.DataFrame({'Actual': y_test, 'Predicted': y_pred})
+
+
+    print('Mean Absolute Error:', metrics.mean_absolute_error(y_test, y_pred))
+    print('Mean Squared Error:', metrics.mean_squared_error(y_test, y_pred))
+    print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
+    RMSE_Linear_regression = np.sqrt(metrics.mean_squared_error(y_test, y_pred))
+    # Linear regression hyper perimeter
+    # lrates = [.5, .1, .01, .001, .0001]
+    # niterations = [25000, 50000, 150000]
+    return RMSE_Linear_regression
+
+
+def random_forest(X_train, X_test, y_train, y_test):
+    # Using Random Forest Regressor.
+
+    # Create regressor object
+    regressor = RandomForestRegressor(n_estimators=100, random_state=0)
+    # fit the regressor with x and y data
+    regressor.fit(X_train, y_train)
+    y_pred = regressor.predict(X_test)
+    print('Root Mean Squared Error Random Forest:', np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
+    RMSE_Random_Forest = np.sqrt(metrics.mean_squared_error(y_test, y_pred))
+    return RMSE_Random_Forest
+
+
+def hyper_perimeter_tuned_random_forest(X_train, X_test, y_train, y_test):
+    # Now, by hyper parameter tuning.
+    regressor = RandomForestRegressor(min_samples_split=3, n_estimators=1000, random_state=1, max_depth=80,
+                                      max_features='log2', min_samples_leaf=1)
+    # fit the regressor with x and y data
+    regressor.fit(X_train, y_train)
+    y_pred = regressor.predict(X_test)
+    print('Root Mean Squared Error Random Forest Tuned:', np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
+    RMSE_Random_Forest_Tuned = np.sqrt(metrics.mean_squared_error(y_test, y_pred))
+    return RMSE_Random_Forest_Tuned
+
+
+def extreme_gradient_boosting(X_train, X_test, y_train, y_test):
+    # Boost ensemble.
+    data_dmatrix = xgb.DMatrix(data=X_train, label=y_train)
+    xg_reg = xgb.XGBRegressor(objective='reg:squarederror', colsample_bytree=0.3, learning_rate=0.1,
+                              max_depth=100, alpha=10, n_estimators=10)
+
+    xg_reg.fit(X_train, y_train)
+    preds = xg_reg.predict(X_test)
+    RMSE_XGBOOST = np.sqrt(mean_squared_error(y_test, preds))
+    print("RMSE Using XGB: %f" % (RMSE_XGBOOST))
+
+    params = {"objective": "reg:squarederror", 'colsample_bytree': 0.3, 'learning_rate': 0.1,
+              'max_depth': 100, 'alpha': 10}
+
+    # k-fold cross validation
+    cv_results = xgb.cv(dtrain=data_dmatrix, params=params, nfold=3,
+                        num_boost_round=1000, early_stopping_rounds=10, metrics="rmse", as_pandas=True, seed=123)
+
+    print((cv_results["test-rmse-mean"]).tail(1))
+    RMSE_XGBOOST_KFOLD_VALIDATION = (cv_results["test-rmse-mean"]).tail(1)
+    return RMSE_XGBOOST, RMSE_XGBOOST_KFOLD_VALIDATION
+
+
+def rmse_comparison_bar_plot(RMSE_Linear_regression, RMSE_Random_Forest, RMSE_Random_Forest_Tuned,
+                             RMSE_XGBOOST, RMSE_XGBOOST_KFOLD_VALIDATION):
+    # create the dataset
+    data = {'RMSE_Linear_regression': RMSE_Linear_regression, 'RMSE_Random_Foresst': RMSE_Random_Forest,
+            'RMSE_Random_Forest_Tuned': RMSE_Random_Forest_Tuned,
+            'RMSE_XGBOOST': RMSE_XGBOOST,
+            'RMSE_XGBOOST_KFOLD_VALIDATION': RMSE_XGBOOST_KFOLD_VALIDATION}
+    labels = list(data.keys())
+    values = list(data.values())
+
+    fig = plt.figure(figsize=(10, 5))
+
+    # create the bar plot
+    plt.bar(labels, values, color='maroon',
+            width=0.4)
+
+
+def correlation_heat_map_plot(df1):
+    print(df1.corr())
+
+    corr = df1.corr()
+
+    # plot the heatmap
+    sns.heatmap(corr,
+                xticklabels=corr.columns,
+                yticklabels=corr.columns)
+
+
+def globe_plot1(df2):
+    # Plot 1, displaying Perceptions of corruption on world map, and use of dictionary
+
+    data = dict(type='choropleth',
+                locations=df2['Country name'].to_list(),
+                locationmode='country names',
+                colorscale='Spectral',
+                text=df2['Country name'].to_list(),
+                z=(df2['Logged GDP per capita']).to_list(),
+                colorbar={'title': 'Logged GDP per capita', 'len': 250, 'lenmode': 'pixels'})
+    col_map = go.Figure(data=[data])
+    col_map.show()
+
+
+def globe_plot2(df2):
+    # Plot 1, displaying happiness index on world map, and use of dictionary
+    data = dict(type='choropleth',
+                locations=df2['Country name'].to_list(),
+                locationmode='country names',
+                colorscale='Spectral',
+                text=df2['Country name'].to_list(),
+                z=(df2['Ladder score']).to_list(),
+                colorbar={'title': 'Ladder Score', 'len': 250, 'lenmode': 'pixels'})
+
+    col_map = go.Figure(data=[data])
+    col_map.show()
+
+
+def line_plot_worst_country(df1):
+    # Line Plot Best Country
+
+    temp_data1 = df1.loc[df1['Country_name'] == 'Afghanistan']
+    # temp_data2=df1.loc[df1['Country_name'] == 'Zimbabwe']
+    # temp_data=pd.concat([temp_data1, temp_data2])
+
+    fig = px.line(x=temp_data1['year'],
+                  y=temp_data1['Life Ladder'],
+                  title='Afghanistan Life Ladder Timeline')
+
+    fig.update_layout({
+        'plot_bgcolor': 'rgba(0, 0, 0, 0)',
+        'paper_bgcolor': 'rgba(0, 0, 0, 0)',
+    })
+    fig.show()
+
+
+def line_plot_best_country(df1):
+    temp_data = df1.loc[df1['Country_name'] == 'Finland']
+
+    fig = px.line(x=temp_data['year'],
+                  y=temp_data['Life Ladder'],
+                  title='Finland Life Ladder Timeline')
+    fig.update_layout({
+        'plot_bgcolor': 'rgba(0, 0, 0, 0)',
+        'paper_bgcolor': 'rgba(0, 0, 0, 0)',
+    })
+    fig.show()
+
+
+if __name__ == "__main__":
+    # Read  dataset.
+    df1 = pd.read_csv('world-happiness-report.csv')
+    df2 = pd.read_csv('world-happiness-report-2021.csv')
+
+    # Analyse  dataset.
+    print(df1.shape)
+    print(df1.dtypes)
+    print(df1.describe())
+    print(df1.isnull().sum())
+
+    # Regex pattern recognition function call.
+    regex_pattren_recognition(df1, df2)
+
+    # Data filtering function call.
+    df1 = data_filtering(df1)
+
+    # Use of iterators for data queries function call.
+    iterator_usage(df1)
+
+    # Train Test split function call.
+    X_train, X_test, y_train, y_test = traindata_testdata_split(df1)
+
+    # Linear regression function call. Function returns accuracy value of algorithm.
+    rmse_linear_regression = linear_regression(X_train, X_test, y_train, y_test)
+
+    # Random Forest function call. Function returns accuracy value of algorithm.
+    rmse_random_forest = random_forest(X_train, X_test, y_train, y_test)
+
+    # Hyper-parameter tuned random forest function call. Function returns accuracy value of algorithm.
+    rmse_random_forest_tuned = hyper_parameter_tuned_random_forest(X_train, X_test, y_train, y_test)
+
+    # Extreme gradient boosting function call. Function returns accuracy value of algorithm.
+    xgb_rmse, xgb_kfold_validation_rmse = extreme_gradient_boosting(X_train, X_test, y_train, y_test)
+
+    # Bar plot comparison of all algorithms used.
+    rmse_comparison_bar_plot(rmse_linear_regression, rmse_random_forest, rmse_random_forest_tunned, xgb_rmse,
+                             xgb_kfold_validation_rmse)
+
+    # Correlation heat map, to display strength of relationship between feature columns.
+    correlation_heat_map_plot(df1)
+
+    # Plot country data on globe.
+    globe_plot1(df2)
+    globe_plot2(df2)
+
+    # Line graph of ladder of life column for best and worst country.
+    line_plot_best_country(df1)
+    line_plot_worst_country(df1)
+
+    # Merge datasets.
+    merged_dataset(X_train, X_test, df1)
